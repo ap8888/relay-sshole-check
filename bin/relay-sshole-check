@@ -1,0 +1,117 @@
+#!/bin/sh
+# RELAY SSHole Check 0.1.0 — passive evidence collection, never a clean bill of health.
+# No target binaries, NSS, network, temporary files, or system writes.
+set -f
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+LC_ALL=C
+export LC_ALL
+root=/
+shadow=no
+effective=
+usage() {
+    cat <<'HELP'
+RELAY SSHole Check 0.1.0
+Usage: relay-sshole-check [--root /trusted/snapshot] [--shadow]
+                          [--effective /trusted/sshd-T.txt]
+Reads local files only. --shadow opts into aggregate local shadow inspection.
+--effective reads an existing sshd -T report; it does not run sshd.
+Exit: 0 help/version; 1 REVIEW_REQUIRED; 2 PRIORITY_REVIEW; 64 usage error;
+      70 evidence processing failure. Neither 1 nor 2 proves vulnerability.
+HELP
+}
+die() { printf '%s\n' 'ERROR: invalid arguments (use --help)' >&2; exit 64; }
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --help) usage; exit 0 ;;
+        --version) printf '%s\n' '0.1.0'; exit 0 ;;
+        --shadow) shadow=yes; shift ;;
+        --root|--effective)
+            [ "$#" -ge 2 ] || die
+            case $2 in /*) ;; *) die ;; esac
+            if [ "$1" = --root ]; then root=$2; else effective=$2; fi
+            shift 2 ;;
+        *) die ;;
+    esac
+done
+[ -d "$root" ] || die
+# / is represented by an empty prefix. Never source files from the target.
+while [ "${root%/}" != "$root" ]; do root=${root%/}; done
+if [ -n "$effective" ] && { [ ! -f "$effective" ] || [ ! -r "$effective" ]; }; then die; fi
+printf '%s\n' 'tool=RELAY SSHole Check' 'version=0.1.0' 'cve=CVE-2026-123158' 
+[ -z "$root" ] && printf '%s\n' 'scope=local-files' || printf '%s\n' 'scope=trusted-snapshot'
+printf '%s\n' 'patch_status=UNVERIFIED' 'running_daemon=UNVERIFIED' 'network_reachability=NOT_TESTED'
+# Distribution fields are sanitized; quotes are data, not shell syntax.
+if [ -f "$root/etc/os-release" ] && [ -r "$root/etc/os-release" ]; then
+    awk -F= '$1=="ID" || $1=="VERSION_ID" {v=$2; gsub(/[^A-Za-z0-9_.-]/,"",v); print "os_" tolower($1) "=" v}' "$root/etc/os-release" || exit 70
+else
+    printf '%s\n' 'os=UNKNOWN'
+fi
+musl=no
+set +f
+for loader in "$root"/lib/ld-musl-*.so.1; do
+    [ -f "$loader" ] && musl=yes
+done
+set -f
+printf '%s\n' "musl_loader_present=$musl" 'sshd_libc_linkage=UNVERIFIED'
+if [ -f "$root/usr/sbin/sshd" ]; then
+    printf '%s\n' 'standard_sshd_file=present'
+else
+    printf '%s\n' 'standard_sshd_file=not_observed'
+fi
+# Read apk installed metadata without running apk or assuming a package proves binary provenance.
+if [ -f "$root/lib/apk/db/installed" ] && [ -r "$root/lib/apk/db/installed" ]; then
+    awk 'BEGIN {RS=""; FS="\n"}
+    {p=""; v=""; for(i=1;i<=NF;i++){if($i~/^P:/)p=substr($i,3);if($i~/^V:/)v=substr($i,3)}
+     if(p~/^openssh($|-)/ && p~/^[a-z0-9-]+$/ && v~/^[a-zA-Z0-9_.+-]+$/)print "apk_package=" p "@" v}' "$root/lib/apk/db/installed" || exit 70
+else
+    printf '%s\n' 'apk_metadata=UNAVAILABLE'
+fi
+config=$root/etc/ssh/sshd_config
+if [ -f "$config" ] && [ -r "$config" ]; then
+    awk 'BEGIN {p=0;m=0;i=0;u=0}
+    {s=$0;sub(/#.*/,"",s);gsub(/=/," ",s);n=split(s,a,/[ \t]+/);k=1;while(k<=n&&a[k]=="")k++;key=tolower(a[k]);
+     if(key=="passwordauthentication")p++;if(key=="usepam")u++;if(key=="match")m++;if(key=="include")i++}
+    END {print "main_config_password_directives=" p;print "main_config_pam_directives=" u;print "main_config_match_directives=" m;print "main_config_include_directives=" i}' "$config" || exit 70
+else
+    printf '%s\n' 'main_config=UNAVAILABLE'
+fi
+printf '%s\n' 'static_config_interpretation=NOT_EFFECTIVE_CONFIGURATION'
+if [ -n "$effective" ]; then
+    # Whitelist output keys and safe characters; never echo raw input or stderr.
+    awk 'BEGIN {seen=0}
+    $1=="passwordauthentication" || $1=="usepam" || $1=="permitrootlogin" || $1=="authenticationmethods" || $1=="kbdinteractiveauthentication" {
+      if(NF==2 && $2~/^[A-Za-z0-9,:@._+-]+$/){print "supplied_effective_" $1 "=" $2;seen++}}
+    END {print "supplied_effective_fields=" seen}' "$effective" || exit 70
+    printf '%s\n' 'effective_scope=USER_SUPPLIED_CONTEXT_ONLY' 'effective_freshness=UNVERIFIED'
+else
+    printf '%s\n' 'effective_config=NOT_SUPPLIED'
+fi
+counts=unknown
+if [ "$shadow" = yes ]; then
+    if [ -f "$root/etc/shadow" ] && [ -r "$root/etc/shadow" ]; then
+        # Hashes and names never leave awk. Exact * only; !*, ! and !! are not counted.
+        counts=$(awk -F: 'BEGIN{s=0;h=0;n=0;bad=0}
+        {n++;if(NF!=9 || $1=="")bad++;if($2=="*")s++;if($2~/^\$[56]\$/)h++}
+        END{if(bad || n==0)print "invalid";else print s " " h}' "$root/etc/shadow") || exit 70
+    fi
+else
+    printf '%s\n' 'local_shadow=NOT_REQUESTED'
+fi
+priority=no
+case $counts in
+    unknown) [ "$shadow" = no ] || printf '%s\n' 'local_shadow=UNAVAILABLE' ;;
+    invalid) printf '%s\n' 'local_shadow=MALFORMED_OR_EMPTY' ;;
+    *)
+        stars=${counts%% *}; sha=${counts#* }
+        printf '%s\n' "local_exact_star_fields=$stars" "local_sha256_sha512_fields=$sha"
+        if [ "$musl" = yes ] && [ "$stars" -gt 0 ] && [ "$sha" -gt 0 ]; then priority=yes; fi ;;
+esac
+printf '%s\n' 'directory_accounts=NOT_QUERIED' 'account_login_eligibility=UNVERIFIED' \
+    'next=Verify vendor patch provenance, actual daemon, libc/PAM, and every applicable connection context.'
+if [ "$priority" = yes ]; then
+    printf '%s\n' 'assessment=PRIORITY_REVIEW' 'reason=musl_loader_and_local_account_pattern_coexist; actual_sshd_exposure_unknown'
+    exit 2
+fi
+printf '%s\n' 'assessment=REVIEW_REQUIRED' 'reason=Evidence is incomplete; absence of observed indicators does not establish safety.'
+exit 1
