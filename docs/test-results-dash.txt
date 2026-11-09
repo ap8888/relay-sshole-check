@@ -1,0 +1,31 @@
+Shell: /bin/dash
+test_config_is_counts_only (__main__.AssessmentTests.test_config_is_counts_only) ... ok
+test_effective_is_not_safety_verdict (__main__.AssessmentTests.test_effective_is_not_safety_verdict) ... ok
+test_effective_no_secret_echo (__main__.AssessmentTests.test_effective_no_secret_echo) ... ok
+test_empty_is_unknown (__main__.AssessmentTests.test_empty_is_unknown) ... ok
+test_empty_shadow (__main__.AssessmentTests.test_empty_shadow) ... ok
+test_files_unchanged (__main__.AssessmentTests.test_files_unchanged) ... ok
+test_fixed_package_still_review (__main__.AssessmentTests.test_fixed_package_still_review) ... ok
+test_help_and_version (__main__.AssessmentTests.test_help_and_version) ... ok
+test_locked_not_star (__main__.AssessmentTests.test_locked_not_star) ... ok
+test_malformed_shadow (__main__.AssessmentTests.test_malformed_shadow) ... ok
+test_missing_effective (__main__.AssessmentTests.test_missing_effective) ... ok
+test_missing_option_value (__main__.AssessmentTests.test_missing_option_value) ... ok
+test_missing_shadow (__main__.AssessmentTests.test_missing_shadow) ... ok
+test_new_upstream_still_review (__main__.AssessmentTests.test_new_upstream_still_review) ... ok
+test_no_hash_partner (__main__.AssessmentTests.test_no_hash_partner) ... ok
+test_no_loader_no_priority (__main__.AssessmentTests.test_no_loader_no_priority) ... ok
+test_no_target_binary_execution (__main__.AssessmentTests.test_no_target_binary_execution) ... ok
+test_opt_in_shadow (__main__.AssessmentTests.test_opt_in_shadow) ... ok
+test_os_release_never_sourced (__main__.AssessmentTests.test_os_release_never_sourced) ... ok
+test_other_hash_does_not_trigger (__main__.AssessmentTests.test_other_hash_does_not_trigger) ... ok
+test_priority_pattern (__main__.AssessmentTests.test_priority_pattern) ... ok
+test_relative_root_rejected (__main__.AssessmentTests.test_relative_root_rejected) ... ok
+test_sha256_partner (__main__.AssessmentTests.test_sha256_partner) ... ok
+test_syntax (__main__.AssessmentTests.test_syntax) ... ok
+test_unknown_option (__main__.AssessmentTests.test_unknown_option) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 0.337s
+
+OK
